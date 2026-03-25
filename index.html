@@ -1579,11 +1579,23 @@ async function fbPush(){
 // ══════════════════════════════════════
 function openOverdueModal(){
   const today=new Date();today.setHours(0,0,0,0);
-  const od=cData.filter(r=>{
-    if(r.sent!=="Sent"||r.received==="Received"||!r.sentdate)return false;
-    const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
-    return Math.floor((today-sd)/86400000)>=15;
-  }).map(r=>{
+  const od = cData.filter(r => {
+  if (r.sent !== "Sent") return false;
+  if (r.received === "Received") return false;
+
+  if (!r.sentdate) return false; // safety
+
+  const sentDate = new Date(r.sentdate);
+  const today = new Date();
+
+  sentDate.setHours(0,0,0,0);
+  today.setHours(0,0,0,0);
+
+  const diffDays = Math.floor((today - sentDate) / (1000 * 60 * 60 * 24));
+
+  return diffDays >= 10; // 👉 tumhara rule: 1 Jan → 11 Jan = 10 days
+});
+  .map(r=>{
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
     return{...r,daysOld:Math.floor((today-sd)/86400000)};
   }).sort((a,b)=>b.daysOld-a.daysOld);
