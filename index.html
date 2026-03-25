@@ -235,18 +235,6 @@ tr:hover{background:#f8fafc}
 </style>
 </head>
 <body>
-<!-- LOGIN -->
-<div id="loginScreen">
-  <div class="lbox">
-    <div class="ico">⚖️</div>
-    <div class="ttl">Court Manager</div>
-    <div class="sub">Baghpat District Court</div>
-    <input type="text" id="lid" placeholder="User ID" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('lpwd').focus()">
-    <input type="password" id="lpwd" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-    <button id="lbtn" onclick="doLogin()">🔐 Login</button>
-    <div id="lerr"></div>
-  </div>
-</div>
 
 <!-- ══ APP HEADER ══ -->
 <div id="app-hdr">
@@ -596,12 +584,7 @@ function getCFMRecord(caseNo){
 // CFM INIT
 // ════════════════════════════════════════
 window.onload=async()=>{
-  // Login
-  if(sessionStorage.getItem('crtLogin')!=='1'){
-    document.getElementById('loginScreen').style.display='flex';
-  } else {
-    document.getElementById('loginScreen').style.display='none';
-  }
+  
   // Firebase config load
   fbLoadConfig();
   try{
