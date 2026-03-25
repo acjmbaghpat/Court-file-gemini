@@ -1471,21 +1471,6 @@ function bFCHTML(f,showLoc){
   </div>`;
 }
 
-  // ══════════════════════════════════════
-// LOGIN
-// ══════════════════════════════════════
-function doLogin(){
-  const id=document.getElementById('lid').value.trim();
-  const pw=document.getElementById('lpwd').value.trim();
-  if(id==='baghpatcourtstaff'&&pw==='27031994'){
-    sessionStorage.setItem('crtLogin','1');
-    document.getElementById('loginScreen').style.display='none';
-  } else {
-    document.getElementById('lerr').textContent='❌ Wrong ID ya Password!';
-    document.getElementById('lpwd').value='';
-  }
-}
-
 // ══════════════════════════════════════
 // FIREBASE SYNC
 // ══════════════════════════════════════
@@ -1637,16 +1622,7 @@ async function saveOverdue(cn) {
     drawTable(getFiltered());
   }
 }
-  window.doLogin = function(){
-  const pwd = document.getElementById('lpwd').value;
-
-  if(pwd === "RamRam"){
-    sessionStorage.setItem('crtLogin','1');
-    document.getElementById('loginScreen').style.display='none';
-  } else {
-    document.getElementById('lerr').innerText = "❌ Galat PIN";
-  }
-};
+  
 </script>
 </body>
 </html>
