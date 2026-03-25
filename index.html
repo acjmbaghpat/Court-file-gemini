@@ -235,6 +235,18 @@ tr:hover{background:#f8fafc}
 </style>
 </head>
 <body>
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="lbox">
+    <div class="ico">⚖️</div>
+    <div class="ttl">Court Manager</div>
+    <div class="sub">Baghpat District Court</div>
+    <input type="text" id="lid" placeholder="User ID" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('lpwd').focus()">
+    <input type="password" id="lpwd" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button id="lbtn" onclick="doLogin()">🔐 Login</button>
+    <div id="lerr"></div>
+  </div>
+</div>
 
 <!-- ══ APP HEADER ══ -->
 <div id="app-hdr">
@@ -440,6 +452,7 @@ tr:hover{background:#f8fafc}
     <button class="btn btn-g" onclick="closeNDModal()" style="margin-top:8px">❌ Skip</button>
   </div>
 </div>
+
 <!-- ══ BUNDLE: MOVE MODAL ══ -->
 <div class="modal" id="bmModal">
   <div class="msh">
@@ -534,7 +547,8 @@ const idbGB  = id=>idbTx(SB,'readonly',s=>s.get(id));
 const idbSBn = obj=>idbTx(SB,'readwrite',s=>s.put(obj));
 const idbDB  = id=>idbTx(SB,'readwrite',s=>s.delete(id));
 const idbAB  = ()=>idbTx(SB,'readonly',s=>s.getAll());
-  // ════════════════════════════════════════
+
+// ════════════════════════════════════════
 // SHARED HELPERS
 // ════════════════════════════════════════
 const COLS=['A','B','C','D','E','F'];
@@ -584,7 +598,12 @@ function getCFMRecord(caseNo){
 // CFM INIT
 // ════════════════════════════════════════
 window.onload=async()=>{
-  
+  // Login
+  if(sessionStorage.getItem('crtLogin')!=='1'){
+    document.getElementById('loginScreen').style.display='flex';
+  } else {
+    document.getElementById('loginScreen').style.display='none';
+  }
   // Firebase config load
   fbLoadConfig();
   try{
@@ -688,7 +707,8 @@ async function uploadExcel(){
     reader.readAsBinaryString(file);
   }catch(err){alert("Upload fail: "+err);}
 }
-  // ════════════════════════════════════════
+
+// ════════════════════════════════════════
 // CFM TABLE
 // ════════════════════════════════════════
 function drawTable(data){
@@ -842,6 +862,7 @@ async function saveNextDate(){
   drawTable(getFiltered());await saveLocal();
   resetJO();lastRcvCase=null;
 }
+
 // ════════════════════════════════════════
 // CFM DOWNLOAD
 // ════════════════════════════════════════
@@ -1472,6 +1493,21 @@ function bFCHTML(f,showLoc){
 }
 
 // ══════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════
+function doLogin(){
+  const id=document.getElementById('lid').value.trim();
+  const pw=document.getElementById('lpwd').value.trim();
+  if(id==='baghpatcourtstaff'&&pw==='27031994'){
+    sessionStorage.setItem('crtLogin','1');
+    document.getElementById('loginScreen').style.display='none';
+  } else {
+    document.getElementById('lerr').textContent='❌ Wrong ID ya Password!';
+    document.getElementById('lpwd').value='';
+  }
+}
+
+// ══════════════════════════════════════
 // FIREBASE SYNC
 // ══════════════════════════════════════
 let _fbDb=null;
@@ -1547,23 +1583,11 @@ async function fbPush(){
 // ══════════════════════════════════════
 function openOverdueModal(){
   const today=new Date();today.setHours(0,0,0,0);
-  const od = cData.filter(r => {
-  if (r.sent !== "Sent") return false;
-  if (r.received === "Received") return false;
-
-  if (!r.sentdate) return false; // safety
-
-  const sentDate = new Date(r.sentdate);
-  const today = new Date();
-
-  sentDate.setHours(0,0,0,0);
-  today.setHours(0,0,0,0);
-
-  const diffDays = Math.floor((today - sentDate) / (1000 * 60 * 60 * 24));
-
-  return diffDays >= 10; // 👉 tumhara rule: 1 Jan → 11 Jan = 10 days
-});
-  .map(r=>{
+  const od=cData.filter(r=>{
+    if(r.sent!=="Sent"||r.received==="Received"||!r.sentdate)return false;
+    const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
+    return Math.floor((today-sd)/86400000)>=15;
+  }).map(r=>{
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
     return{...r,daysOld:Math.floor((today-sd)/86400000)};
   }).sort((a,b)=>b.daysOld-a.daysOld);
@@ -1622,9 +1646,6 @@ async function saveOverdue(cn) {
     drawTable(getFiltered());
   }
 }
-  
 </script>
 </body>
 </html>
-  
-  
