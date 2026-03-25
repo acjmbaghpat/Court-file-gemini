@@ -1654,16 +1654,16 @@ async function saveOverdue(cn) {
     drawTable(getFiltered());
   }
 }
-  function doLogin(){
+  window.doLogin = function(){
   const pwd = document.getElementById('lpwd').value;
 
-  if(pwd === "RamRam"){   // 👉 apna PIN yahan change kar sakte ho
+  if(pwd === "RamRam"){
     sessionStorage.setItem('crtLogin','1');
     document.getElementById('loginScreen').style.display='none';
   } else {
     document.getElementById('lerr').innerText = "❌ Galat PIN";
   }
-  }
+};
 </script>
 </body>
 </html>
