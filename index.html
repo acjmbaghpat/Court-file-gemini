@@ -520,6 +520,7 @@ const totalCount     = document.getElementById('totalCount');
 const sentCount      = document.getElementById('sentCount');
 const receivedCount  = document.getElementById('receivedCount');
 const excelFile      = document.getElementById('excelFile');
+const manualCaseInput= document.getElementById('manualCaseInput');
 
 // ════════════════════════════════════════
 // IndexedDB
@@ -624,8 +625,23 @@ window.onload=async()=>{
     workDate.value=new Date().toISOString().split("T")[0];
     await loadVersions();await loadCurV();await loadLocal();
     updateSU();bInit();
+    checkReminders();
   }catch(e){console.error("Init:",e);}
 };
+
+// ── Reminder checker — app open hone par check karo ──
+function checkReminders(){
+  const today=new Date().toISOString().split('T')[0];
+  const due=cData.filter(r=>r._reminder&&r._reminder<=today&&r.sent==="Sent"&&r.received!=="Received");
+  if(!due.length)return;
+  // Highlight overdue card
+  const ovCard=document.getElementById('ovCard');
+  if(ovCard)ovCard.style.animation='pulse 0.8s 4';
+  // Show toast after small delay
+  setTimeout(()=>{
+    showToast('🔔 '+due.length+' file(s) ka reminder aaj hai! Overdue card tap karo.','w');
+  },1200);
+}
 async function updateSU(){
   try{
     if(navigator.storage&&navigator.storage.estimate){
@@ -665,7 +681,9 @@ function updateDash(){
   // Overdue count
   const today=new Date();today.setHours(0,0,0,0);
   const od=cData.filter(r=>{
-    if(r.sent!=="Sent"||r.received==="Received"||!r.sentdate)return false;
+    if(r.sent!=="Sent"||r.received==="Received")return false;
+    // Agar sentdate nahi hai purane data mein — tab bhi check karo
+    if(!r.sentdate)return true;
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
     return Math.floor((today-sd)/86400000)>=10;
   });
@@ -874,7 +892,7 @@ async function saveNextDate(){
   document.getElementById("ndModal").classList.remove("on");
   const dt=new Date(d);
   speak("Next date "+dt.getUTCDate()+" "+dt.toLocaleDateString("en-IN",{month:"long",timeZone:"UTC"}));
-  drawTable(getFiltered());await saveLocal();
+  drawTable(getFiltered());updateDash();await saveLocal();
   resetJO();lastRcvCase=null;
 }
 
@@ -1579,9 +1597,11 @@ function fbReset(){
 }
 
 let _fbUnsub=null;
-function fbInit(cfg){
+async function fbInit(cfg){
   try{
-    if(firebase.apps.length)firebase.apps.forEach(a=>a.delete());
+    if(firebase.apps.length){
+      await Promise.all(firebase.apps.map(a=>a.delete()));
+    }
     firebase.initializeApp(cfg);
     _fbDb=firebase.firestore();
     setSyncDot('ok');
@@ -1623,21 +1643,36 @@ let _ovData=[];  // stores overdue records by index (fixes caseno special-char b
 function openOverdueModal(){
   const today=new Date();today.setHours(0,0,0,0);
   const od=cData.filter(r=>{
-    if(r.sent!=="Sent"||r.received==="Received"||!r.sentdate)return false;
+    if(r.sent!=="Sent"||r.received==="Received")return false;
+    if(!r.sentdate)return true;
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
     return Math.floor((today-sd)/86400000)>=10;
   }).map(r=>{
+    if(!r.sentdate)return{...r,daysOld:'?'};
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
     return{...r,daysOld:Math.floor((today-sd)/86400000)};
-  }).sort((a,b)=>b.daysOld-a.daysOld);
+  }).sort((a,b)=>{
+    if(a.daysOld==='?')return-1;if(b.daysOld==='?')return 1;
+    return b.daysOld-a.daysOld;
+  });
 
   if(!od.length){showToast('✅ Koi overdue file nahi!');return;}
   _ovRemSel={};
   _ovData=od;  // store by index — safe for any caseno format
 
   document.getElementById('ovList').innerHTML=od.map((r,i)=>{
-    return`<div class="ov-item" id="ovi-${i}">
-      <div class="ov-hd"><span class="ov-cn">${esc(r.caseno)}</span><span class="ov-days">${r.daysOld} din</span></div>
+    const today=new Date().toISOString().split('T')[0];
+    const hasReminder=r._reminder&&r._reminder>today;
+    const reminderDue=r._reminder&&r._reminder<=today;
+    return`<div class="ov-item" id="ovi-${i}" style="${reminderDue?'border-color:#f59e0b;background:#fffbeb':''}">
+      <div class="ov-hd">
+        <span class="ov-cn">${esc(r.caseno)}</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${reminderDue?'<span style="background:#fef3c7;color:#92400e;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700">🔔 Reminder Aaj</span>':''}
+          ${hasReminder?`<span style="background:#ede9fe;color:var(--p);font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700">📅 ${r._reminder}</span>`:''}
+          <span class="ov-days">${r.daysOld==='?'?'📅 Date Unknown':r.daysOld+' din'}</span>
+        </div>
+      </div>
       <div class="ov-pt">👤 ${esc(r.partyname||'')}${r.section?' | '+esc(r.section):''}${r.ps?' | '+esc(r.ps):''}</div>
       <textarea class="ov-rem" id="ovr-${i}" rows="2" placeholder="Remark...">${esc(r.remark||'')}</textarea>
       <div class="ov-rdiv">
