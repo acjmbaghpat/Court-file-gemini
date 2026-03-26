@@ -215,7 +215,7 @@ tr:hover{background:#f8fafc}
 .ov-cn{font-weight:700;color:var(--p);font-size:15px}
 .ov-days{color:#ef4444;font-size:12px;font-weight:700;background:#fee2e2;padding:2px 8px;border-radius:5px}
 .ov-pt{color:var(--mu);font-size:12px;margin-bottom:8px}
-.ov-rem{width:100%;padding:9px 12px;border:1.5px solid var(--bdr);border-radius:8px;font-size:13px;font-family:inherit;resize:none;background:#f8fafc;margin-bottom:6px;}
+.ov-rem{width:100%;padding:9px 12px;border:1.5px solid var(--bdr);border-radius:8px;font-size:13px;font-family:inherit;resize:none;background:#f8fafc}
 .ov-rem:focus{border-color:var(--p);outline:none}
 .ov-rdiv{margin-top:9px;border-top:1px solid var(--bdr);padding-top:9px}
 .ov-rlbl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
@@ -271,7 +271,7 @@ tr:hover{background:#f8fafc}
     <div class="card">📁 Total<br><span id="totalCount">0</span></div>
     <div class="card">📤 Sent<br><span id="sentCount">0</span></div>
     <div class="card">📥 Received<br><span id="receivedCount">0</span></div>
-    <div class="card" onclick="openOverdueModal()" style="cursor:pointer" id="ovCard" title="Tap to see overdue details">⏰ Overdue<br><span id="overdueCount" style="color:#ef4444">0</span></div>
+    <div class="card" onclick="openOverdueModal()" style="cursor:pointer" id="ovCard">⏰ Overdue (10+d)<br><span id="overdueCount" style="color:#ef4444">0</span></div>
     <div class="card" style="grid-column:span 4">💾 Storage<br><span id="storageUsage" style="font-size:12px;color:var(--mu)">...</span></div>
   </div>
   <div class="sec">
@@ -501,7 +501,7 @@ tr:hover{background:#f8fafc}
 <!-- OVERDUE MODAL -->
 <div class="modal" id="ovModal">
   <div class="msh" style="max-height:92vh;overflow-y:auto">
-    <div class="mt">⏰ Overdue Files (15+ Din Sent, Received Nahi)</div>
+    <div class="mt">⏰ Overdue Files (10+ Din Sent, Received Nahi)</div>
     <div class="msub">In files pe follow-up karein</div>
     <div id="ovList"></div>
     <button class="btn btn-g" onclick="document.getElementById('ovModal').classList.remove('on')" style="margin-top:6px">✕ Band Karo</button>
@@ -509,6 +509,18 @@ tr:hover{background:#f8fafc}
 </div>
 
 <script>
+// ════════════════════════════════════════
+// DOM ELEMENT REFERENCES (safe getElementById)
+// ════════════════════════════════════════
+const workDate       = document.getElementById('workDate');
+const versionSelect  = document.getElementById('versionSelect');
+const searchBox      = document.getElementById('searchBox');
+const storageUsage   = document.getElementById('storageUsage');
+const totalCount     = document.getElementById('totalCount');
+const sentCount      = document.getElementById('sentCount');
+const receivedCount  = document.getElementById('receivedCount');
+const excelFile      = document.getElementById('excelFile');
+
 // ════════════════════════════════════════
 // IndexedDB
 // ════════════════════════════════════════
@@ -577,7 +589,7 @@ function switchTab(t){
 // ════════════════════════════════════════
 // CFM STATE
 // ════════════════════════════════════════
-const DK=["srno","caseno","partyname","section","ps","sent","received","receiveddate","nextdate","remark","reminder_date"];
+const DK=["srno","caseno","partyname","section","ps","sent","received","receiveddate","nextdate","remark"];
 let cData=[], upV=1, aFilter='all', lastRcvCase=null, dropIdx=-1;
 let sDeb;
 const rTimers = {}; // per-case debounce timers
@@ -585,6 +597,7 @@ function sId(id){return String(id||"").replace(/[^a-zA-Z0-9-_]/g,'_');}
 function gSrch(r){return DK.map(k=>r[k]||"").join(' ').toLowerCase();}
 function dKey(){return workDate.value+"_"+upV;}
 function fmtD(iso){if(!iso)return"";const p=iso.split("-");return p.length===3?p[2]+"-"+p[1]+"-"+p[0]:iso;}
+// Get CFM next date day number for a case
 function getCFMDay(caseNo){
   const r=cData.find(x=>x.caseno===String(caseNo).toUpperCase()||x.caseno===String(caseNo));
   if(!r||!r.nextdate)return null;
@@ -636,8 +649,8 @@ async function loadLocal(){
   catch(e){cData=[];}
   drawTable(getFiltered());updateDash();
 }
-workDate.addEventListener("change",async()=>{await loadVersions();await loadCurV();await loadLocal();});
-versionSelect.addEventListener("change",async()=>{upV=parseInt(versionSelect.value);await saveCurV();await loadLocal();});
+workDate.addEventListener("change",async()=>{await loadVersions();await loadCurV();await loadLocal();fbStartListen();});
+versionSelect.addEventListener("change",async()=>{upV=parseInt(versionSelect.value);await saveCurV();await loadLocal();fbStartListen();});
 
 // ════════════════════════════════════════
 // CFM DASHBOARD
@@ -654,7 +667,7 @@ function updateDash(){
   const od=cData.filter(r=>{
     if(r.sent!=="Sent"||r.received==="Received"||!r.sentdate)return false;
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
-    return Math.floor((today-sd)/86400000)>=15;
+    return Math.floor((today-sd)/86400000)>=10;
   });
   const oc=document.getElementById("overdueCount");
   if(oc)oc.innerText=od.length;
@@ -694,7 +707,7 @@ async function uploadExcel(){
         let rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:""});
         if(rows.length>0)rows.shift();
         cData=rows.map(r=>{
-          const rec={srno:r[0]||"",caseno:String(r[1]||"").trim(),partyname:r[2]||"",section:r[3]||"",ps:r[4]||"",sent:"",received:"",receiveddate:"",nextdate:"",remark:"",reminder_date:""};
+          const rec={srno:r[0]||"",caseno:String(r[1]||"").trim(),partyname:r[2]||"",section:r[3]||"",ps:r[4]||"",sent:"",received:"",receiveddate:"",nextdate:"",remark:""};
           rec.searchableText=gSrch(rec);return rec;
         }).filter(r=>r.caseno!=="");
         const opt=document.createElement("option");opt.value=upV;opt.text="Upload "+upV;versionSelect.appendChild(opt);versionSelect.value=upV;
@@ -799,6 +812,7 @@ async function manualAction(mode){
     if(rec.sent==="Sent"){showMS("ℹ️ Already SENT: "+cn,"info");speak("Already sent");return;}
     cData[idx].sent="Sent";cData[idx].sentdate=new Date().toISOString().split("T")[0];cData[idx].searchableText=gSrch(cData[idx]);
     showMS("✅ SENT: "+cn,"ok");speak("File sent");manualCaseInput.value="";
+    // Hide bundle entry
     await hideBundleEntry(cn);
   } else {
     if(rec.sent!=="Sent"){showMS("❌ Pehle SENT karo","err");speak("File not sent yet");return;}
@@ -825,6 +839,7 @@ function scrollToFile(cn){
 // ════════════════════════════════════════
 // CFM NEXT DATE MODAL
 // ════════════════════════════════════════
+// J/O state
 let ndJO=null;
 function toggleJO(t){
   ndJO=ndJO===t?null:t;
@@ -1038,7 +1053,7 @@ async function hideBundleEntry(caseNo){
 // BUNDLE STATE + COLUMN SYSTEM
 // ════════════════════════════════════════
 // Use COLS and DATES already declared above
-const COLS_NORMAL = COLS; 
+const COLS_NORMAL = COLS; // COLS = ['A','B','C','D','E','F'] from CFM section
 
 function getColsForDate(md) {
   if(SPECIAL_DATES.includes(md)) {
@@ -1050,12 +1065,14 @@ function getColsForDate(md) {
   return COLS_NORMAL;
 }
 function dispCol(col) {
+  // S1A → S1-A, S2O → S2-O, A → A
   if(col && col.length === 3 && (col.startsWith('S1') || col.startsWith('S2'))) {
     return col.slice(0,2)+'-'+col.slice(2);
   }
   return col;
 }
 
+// DATES already declared above (Array 1-31)
 const SHELF_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'];
 const SPECIAL_DATES = [29,30,31];
 let bFiles={}, bRM=false, bMoveId=null, bSlot=null, bActiveDate=null;
@@ -1088,16 +1105,19 @@ function bBDG(id,sel,cb){
   el.innerHTML=DATES.map(d=>`<button class="db${sel===d?' on':''}" onclick="(${cb})(${d})">${d}</button>`).join('');
 }
 
+// ── Column buttons (changes based on selected date) ──
 function bRenderColButtons() {
   const wrap = document.getElementById('b-cr-wrap');
   const cols = getColsForDate(bAMD);
   const isSpecial = SPECIAL_DATES.includes(bAMD);
 
   if(!isSpecial) {
+    // Simple row
     wrap.innerHTML = `<div class="crow" id="b-cr">`+
       cols.map(c=>`<button class="cb${bAC===c?' on':''}" onclick="bSetCol('${c}')">${c}</button>`).join('')+
       `</div>`;
   } else {
+    // Two safes, 5 shelves each, 3 cols per shelf
     let h = '';
     ['S1','S2'].forEach(safe=>{
       h += `<div style="margin-bottom:10px">
@@ -1117,6 +1137,7 @@ function bRenderColButtons() {
     });
     wrap.innerHTML = h;
   }
+  // If current bAC not valid for new date, reset
   if(!getColsForDate(bAMD).includes(bAC)){
     bAC = getColsForDate(bAMD)[0];
     bRenderColButtons();
@@ -1168,6 +1189,7 @@ function bCC(arr){
   return arr.length>=40?'sc-f': arr.length>=25?'sc-h':'sc-e';
 }
 
+// ── GRID: date list ──
 function bRenderGrid(){
   const m = bSM();
   const dates = [...new Set(Object.values(bFiles).filter(f=>!f.hidden).map(f=>f.md))].sort((a,b)=>a-b);
@@ -1197,6 +1219,7 @@ function bRenderGrid(){
       <span style="color:var(--mu);font-size:18px">›</span>
     </button>`;
 
+    // Rearrange mode: show files inline
     if(bRM){
       allInDate.forEach(f=>{
         h+=`<div style="margin:-6px 0 8px 14px"><button class="rmfb" onclick="bOpenMove('${esc(f.id)}')" style="display:inline-block;width:auto;margin-right:4px">⇄ ${esc(f.id)} (${dispCol(f.col)})</button></div>`;
@@ -1214,12 +1237,14 @@ function toggleRM(){
   bRenderGrid();
 }
 
+// ── Date detail: columns of that date ──
 function bOpenDate(date){
   bActiveDate = date;
   const m = bSM();
   const isSpecial = SPECIAL_DATES.includes(date);
   const allCols = getColsForDate(date);
 
+  // Get all slots for this date
   const slotsForDate = Object.entries(m)
     .filter(([k])=>+k.split('|')[0]===date)
     .map(([k,arr])=>({...bPK(k),arr}));
@@ -1263,11 +1288,13 @@ function bOpenDate(date){
   if(!slotsForDate.length) h='<div class="bempty">Is date mein koi slot nahi.</div>';
   document.getElementById('bdd-cols').innerHTML = h;
 
+  // Show date view
   document.querySelectorAll('.bnb').forEach(b=>b.classList.remove('on'));
   document.querySelectorAll('.bview').forEach(el=>el.classList.remove('on'));
   document.getElementById('bview-date').classList.add('on');
 }
 
+// ── Slot detail (files in col) ──
 function bOSlot(md,sd,col,backView){
   bSlot={md,sd,col};
   document.getElementById('bsd-back').onclick = ()=>{ if(backView==='date') bOpenDate(md); else swBV('grid'); };
@@ -1283,6 +1310,7 @@ function bRenderSlot(){
   document.getElementById('bsd-c').innerHTML=arr.length?arr.map(f=>bFCHTML(f,false)).join(''):'<div class="bempty">Koi file nahi.</div>';
 }
 
+// ── Add form ──
 function bRenderAdd(){
   bBDG('b-mdg', bAMD, d=>{ bAMD=d; bRenderColButtons(); bRenderAdd(); });
   if(bASD!==null){ const el=document.getElementById('b-sdg'); if(el) bBDG('b-sdg',bASD,d=>{ bASD=d; bRenderAdd(); }); }
@@ -1316,6 +1344,7 @@ function bUpdateST(){
   if(el&&scanCtx==='bundle') el.textContent=`📷 Bundle → Date ${bAMD}${bASD!=null?'/'+bASD:''} ${dispCol(bAC)}`;
 }
 
+// ── Add file (all 3 rules) ──
 async function bAddFile(rawId, fromScan){
   const id=rawId.trim().toUpperCase(); if(!id) return false;
 
@@ -1359,12 +1388,14 @@ function bMAdd(){
   document.getElementById('b-mi').value='';
 }
 
+// ── Scanner ──
 function startBundleScan(){
   bUpdateST();
   openScan('bundle',`📷 Bundle → Date ${bAMD}${bASD!=null?'/'+bASD:''} ${dispCol(bAC)}`,true);
 }
 function handleBundleScan(dec){ bAddFile(dec,true); if(scanActive) bUpdateST(); }
 
+// ── Mismatch modal ──
 function openMismatchModal(id, cfmDay){
   mmPending={id,cfmDay}; mmSD=1;
   document.getElementById('mm-title').textContent=`⚠ Case: ${id}`;
@@ -1392,6 +1423,7 @@ function cancelMismatch(){
   showSC('❌ Scan reject: date mismatch','#e03030');
 }
 
+// ── File actions ──
 async function bSetStatus(id,st){
   if(!bFiles[id])return;
   bFiles[id].st=st; await idbSBn(bFiles[id]);
@@ -1409,6 +1441,7 @@ async function bDelFile(id){
   bRenderGrid(); if(bSlot)bRenderSlot(); bRenderSearch();
 }
 
+// ── Move modal ──
 function bOpenMove(id){
   bMoveId=id; const f=bFiles[id];
   bMMD=f.md; bMSD=f.sd!=null?f.sd:null; bMC=f.col;
@@ -1449,10 +1482,12 @@ async function doBundleMove(){
   bRenderSearch();
 }
 
+// ── Search ──
 function bRenderSearch(){
   const q=document.getElementById('b-si').value.trim().toLowerCase();
   const res=document.getElementById('b-sr');
   const allV=Object.values(bFiles);
+  // Missing: only files with missing tag (not hidden)
   const miss=allV.filter(f=>f.st==='missing'&&!f.hidden);
   const tot=allV.filter(f=>!f.hidden).length;
 
@@ -1468,6 +1503,7 @@ function bRenderSearch(){
   res.innerHTML=tot?'<div style="color:var(--suc);font-size:13px;text-align:center;margin-top:30px;font-weight:600">✅ Koi missing nahi</div>':'<div class="bempty">Koi file add nahi ki abhi.</div>';
 }
 
+// ── File card HTML ──
 function bFCHTML(f,showLoc){
   const id=esc(f.id), isHidden=f.hidden;
   return `<div class="bfc${f.st==='missing'?' miss':''}">
@@ -1579,73 +1615,92 @@ async function fbPush(){
 }
 
 // ══════════════════════════════════════
-// OVERDUE MODAL (COMPLETED)
+// OVERDUE MODAL
 // ══════════════════════════════════════
+let _ovRemSel={};
+let _ovData=[];  // stores overdue records by index (fixes caseno special-char bugs)
+
 function openOverdueModal(){
   const today=new Date();today.setHours(0,0,0,0);
   const od=cData.filter(r=>{
     if(r.sent!=="Sent"||r.received==="Received"||!r.sentdate)return false;
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
-    return Math.floor((today-sd)/86400000)>=15;
+    return Math.floor((today-sd)/86400000)>=10;
   }).map(r=>{
     const sd=new Date(r.sentdate);sd.setHours(0,0,0,0);
     return{...r,daysOld:Math.floor((today-sd)/86400000)};
   }).sort((a,b)=>b.daysOld-a.daysOld);
 
   if(!od.length){showToast('✅ Koi overdue file nahi!');return;}
+  _ovRemSel={};
+  _ovData=od;  // store by index — safe for any caseno format
 
-  document.getElementById('ovList').innerHTML=od.map(r=>{
-    const cn=String(r.caseno).replace(/'/g,"\\'");
-    const remD = r.reminder_date ? `(Reminder: ${fmtD(r.reminder_date)})` : '';
-    return`<div class="ov-item" id="ovi-${esc(r.caseno)}">
-      <div class="ov-hd"><span class="ov-cn">${esc(r.caseno)} ${remD}</span><span class="ov-days">${r.daysOld} din</span></div>
-      <div class="ov-pt">${esc(r.partyname||"")}</div>
-      <input type="text" class="ov-rem" id="ov-rem-${esc(r.caseno)}" placeholder="Remark likhein..." value="${esc(r.remark||"")}">
+  document.getElementById('ovList').innerHTML=od.map((r,i)=>{
+    return`<div class="ov-item" id="ovi-${i}">
+      <div class="ov-hd"><span class="ov-cn">${esc(r.caseno)}</span><span class="ov-days">${r.daysOld} din</span></div>
+      <div class="ov-pt">👤 ${esc(r.partyname||'')}${r.section?' | '+esc(r.section):''}${r.ps?' | '+esc(r.ps):''}</div>
+      <textarea class="ov-rem" id="ovr-${i}" rows="2" placeholder="Remark...">${esc(r.remark||'')}</textarea>
       <div class="ov-rdiv">
-        <div class="ov-rlbl">Reminder Set Karo:</div>
-        <div class="ov-ropts">
-          <button class="ropt" onclick="setReminder('${cn}', 3)">3 Din</button>
-          <button class="ropt" onclick="setReminder('${cn}', 7)">7 Din</button>
-          <button class="ropt" onclick="setReminder('${cn}', 10)">10 Din</button>
-          <button class="ropt cx" onclick="setReminder('${cn}', 0)">Cancel</button>
+        <div class="ov-rlbl">🔔 Reminder — Kitne din baad?</div>
+        <div class="ov-ropts" id="rops-${i}">
+          <button class="ropt" onclick="selR(${i},3)">3 Din</button>
+          <button class="ropt" onclick="selR(${i},7)">7 Din</button>
+          <button class="ropt" onclick="selR(${i},10)">10 Din</button>
+          <button class="ropt cx" onclick="selR(${i},0)">❌ Cancel</button>
         </div>
       </div>
-      <button class="ov-save" onclick="saveOverdue('${cn}')">💾 Save Details</button>
+      <button class="ov-save" onclick="ovSave(${i})">💾 Save</button>
     </div>`;
   }).join('');
-  
   document.getElementById('ovModal').classList.add('on');
 }
 
-async function setReminder(cn, days) {
-  const idx = cData.findIndex(r => r.caseno === cn);
-  if(idx === -1) return;
-  
-  if (days === 0) {
-    cData[idx].reminder_date = "";
-    showToast(`❌ Reminder cancelled for ${cn}`);
-  } else {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    cData[idx].reminder_date = d.toISOString().split("T")[0];
-    showToast(`✅ Reminder set for ${days} days (${fmtD(cData[idx].reminder_date)})`);
-  }
-  await saveLocal();
-  openOverdueModal(); 
+// Bug 4 fix: use getElementById instead of querySelectorAll with CSS selector
+// (caseno ke special chars jaise / & ' CSS selector tod dete the)
+function selR(i,days){
+  const cn=_ovData[i]?_ovData[i].caseno:null;
+  if(cn)_ovRemSel[cn]=days;
+  const container=document.getElementById('rops-'+i);
+  if(!container)return;
+  const btns=container.querySelectorAll('.ropt');
+  btns.forEach((b,bi)=>{
+    b.classList.remove('on');
+    if(days===0&&bi===3)b.classList.add('on');
+    else if(days===3&&bi===0)b.classList.add('on');
+    else if(days===7&&bi===1)b.classList.add('on');
+    else if(days===10&&bi===2)b.classList.add('on');
+  });
 }
 
-async function saveOverdue(cn) {
-  const idx = cData.findIndex(r => r.caseno === cn);
-  if(idx === -1) return;
-  const remInput = document.getElementById(`ov-rem-${cn}`);
-  if(remInput) {
-    cData[idx].remark = remInput.value;
-    cData[idx].searchableText = gSrch(cData[idx]);
+// Bug 5 fix: use index to get caseno — no encoding mismatch possible
+async function ovSave(i){
+  const r=_ovData[i]; if(!r)return;
+  const cn=r.caseno;
+  const remark=(document.getElementById('ovr-'+i)||{}).value||'';
+  const days=_ovRemSel[cn]??null;
+  // Update remark in cData
+  const idx=cData.findIndex(x=>x.caseno===cn);
+  if(idx!==-1){
+    if(remark)cData[idx].remark=remark;
+    // Store reminder info
+    if(days!==null){
+      if(days===0){
+        delete cData[idx]._reminder;
+      } else {
+        const rd=new Date();rd.setDate(rd.getDate()+days);
+        cData[idx]._reminder=rd.toISOString().split('T')[0];
+      }
+    }
+    cData[idx].searchableText=gSrch(cData[idx]);
     await saveLocal();
-    showToast(`✅ Details saved for ${cn}`);
-    drawTable(getFiltered());
   }
+  const msg=days===0?'❌ Reminder cancel hua':'✅ Saved'+(days?' | '+days+' din mein reminder':'');
+  showToast(msg);
+  const el=document.getElementById('ovi-'+i);
+  if(el){el.style.opacity='0.4';el.style.pointerEvents='none';}
 }
+
+
 </script>
 </body>
 </html>
